@@ -182,13 +182,19 @@ const properties = [{
     }
 ];
 
-// get input elements - our filters
+// get input elements 
+// - our filters
 const locationFilter = document.getElementById("location");
 const bedroomsFilter = document.getElementById("bedrooms");
 const bathroomsFilter = document.getElementById("bathrooms");
 const priceMin = document.getElementById("priceMin");
 const priceMax = document.getElementById("priceMax");
+// - our sorting buttons
+const highToLowBtn = document.getElementById('price-high-to-low-btn');
+const lowToHighBtn = document.getElementById('price-low-to-high-btn');
+const alphabeticalBtn = document.getElementById('alphabetical-btn');
 
+// ------------*********** CLICK FUNCTIONS ***********------------
 //onchange event on each filter:
 //location
 locationFilter.addEventListener("change", function () {
@@ -220,7 +226,27 @@ priceMax.addEventListener("change", function () {
     filterAndPopulateResults();
 });
 
+//  ------------ Sorting Button Clicks: --------
+highToLowBtn.addEventListener('click', function() {
+    const filteredProperties = filterProperties();
+    const sortedProperties = sortPropertiesByPriceHighToLow(filteredProperties); // sorting filtered properties by price high to low
+    populateResults(sortedProperties);
+});
 
+lowToHighBtn.addEventListener('click', function() {
+    const filteredProperties = filterProperties();
+    const sortedProperties = sortPropertiesByPriceLowToHigh(filteredProperties); // sorting filtered properties by price low to high
+    populateResults(sortedProperties);
+});
+
+alphabeticalBtn.addEventListener('click', function() {
+    const filteredProperties = filterProperties();
+    const sortedProperties = sortPropertiesAlphabetical(filteredProperties); // sorting filtered properties by name alphabetically
+    populateResults(sortedProperties);
+});
+
+
+// ------------********* FILTERING FUNCTIONS & LOGIC *********----------
 //filter results - return an array of filtered properties
 function filterProperties() {
     const filteredProperties = properties.filter(property => {
@@ -247,7 +273,7 @@ function filterProperties() {
         const priceValue = parseFloat(property.price.replace(/\$/g, '').replace(/,/g, '')); // removes $ and , from price and make the number a floating number
         const minPrice = parseFloat(priceMin.value);
         const maxPrice = parseFloat(priceMax.value);
-        if((minPrice && priceValue < minPrice) || (maxPrice && priceValue > maxPrice)) {
+        if ((minPrice && priceValue < minPrice) || (maxPrice && priceValue > maxPrice)) {
             return false
         }
         //if all conditions pass, include the proper in the filtered array
@@ -258,11 +284,41 @@ function filterProperties() {
     return filteredProperties;
 }
 
+// ------------ SORT FUNTCIONS --------------
 // sort results - sort by price - lowest to highest
+function sortPropertiesByPriceLowToHigh(properties) {
+    return properties.sort((a, b) => {
+        const priceA = parseFloat(a.price.replace(/\$/g, '').replace(/,/g, ''));
+        const priceB = parseFloat(b.price.replace(/\$/g, '').replace(/,/g, ''));
+        return priceA - priceB;
+    })
+}
 
+// sort results - sort by price - high to low
+function sortPropertiesByPriceHighToLow(properties) {
+    return properties.sort((a, b) => {
+        const priceA = parseFloat(a.price.replace(/\$/g, '').replace(/,/g, ''));
+        const priceB = parseFloat(b.price.replace(/\$/g, '').replace(/,/g, ''));
+        return priceB - priceA;
+    })
+}
+
+// Sort by name alphabetically
+function sortPropertiesAlphabetical(properties) {
+    return properties.sort((a,b) => {
+        const nameA = a.name.toLowerCase(); // property a name to lowercase
+        const nameB = b.name.toLowerCase(); // property b name to lowercase
+        return nameA.localeCompare(nameB);
+    })
+}
+
+
+// ------------************* POPULATION FUNCTIONS *************------------
 // Filter and then Populate Results
 function filterAndPopulateResults() {
     const filteredProperties = filterProperties();
+    //sort properties before populating:
+    // const sortedProperties = sortPropertiesByPrice(filteredProperties); //sorting the filtered properties from previous line
     populateResults(filteredProperties);
 }
 
@@ -309,20 +365,114 @@ function populateResults(filteredResults) {
             </div>
             `;
             resultsDiv.innerHTML += propertyCardHTML;
+            attachModalToImages(); // attaching event listeners straight after population
+
+             // // Re-initialize Swiper Instances
+            const swipers = document.querySelectorAll('.swiper');
+            swipers.forEach(swiperEl => {
+                new Swiper(swiperEl, {
+                    direction: 'vertical',
+                    loop: true,
+                    pagination: {
+                        el: '.swiper-pagination',
+                        clickable: true,
+                    }
+                })
+            });
         });
     }
 };
 
 
+
+// ---------------********** MODAL FUNCTIONS *********--------------
+// attach a click to each image and open the modal
+function attachModalToImages() {
+    // Get all the images
+    const images = document.querySelectorAll('.property-image');
+    // Get the the details modal from the HTML
+    const detailsModal = document.getElementById('details-modal');
+
+    // run a foor loop over the images array to add click event to each image
+    for (let i = 0; i < images.length; i++) {
+        images[i].addEventListener('click', function (event) {
+            const scrollPosition = window.pageYOffset || documentElement.scrollTop;
+            detailsModal.dataset.scrollPosition = scrollPosition // Storing scroll position in the modals dataset
+            const rect = event.target.getBoundingClientRect(); // Get the position of the clicked image relative to the viewport
+            const imageTop = rect.top + scrollPosition; // Calculate the top position f the clicked image
+            const windowHeight = window.innerHeight;
+            const dialogHeight = detailsModal.offsetHeight; // height of the modal
+            const viewportTop = scrollPosition;
+
+            let dialogTop = viewportTop + (windowHeight - dialogHeight) / 2; // Calcualte the top position for the dialog to be centered
+
+            //Ensure the dilaog doesnt go above or below the viewport:
+            if (dialogTop < imageTop) {
+                dialogTop = imageTop; // Place the dialog just below the clicked image if theres enough space
+            } else if (dialogTop + dialogHeight > windowHeight + viewportTop) {
+                dialogTop = windowHeight + viewportTop - dialogHeight; // Place the dialog at the bottom of the viewport if theres not enough space
+            }
+
+            detailsModal.style.top = dialogTop + 'px'; // set top position of the dialog
+
+            console.log('image click working');
+            detailsModal.showModal(); // open modal
+            document.body.classList.add('modal-open'); // add class to disable scrolling
+            // add close function:
+            closeDetailsModal();
+            // populate modal with correct info:
+            console.log(event.target.getAttribute('value'));
+            populateModal(event.target.getAttribute('value'));
+        })
+    }
+}
+
+
+// closing modals
+function closeDetailsModal() {
+    // Get close button of modal
+    const close = document.getElementById('close-modal');
+    // Get the modal
+    const detailsModal = document.getElementById('details-modal');
+
+    //click event on close modal to close the modal
+    close.addEventListener('click', function () {
+        detailsModal.close();
+        document.body.classList.remove('modal-open'); // remove scroll-lock class
+        const scrollPosition = detailsModal.dataset.scrollPosition || 0;
+        window.scrollTo(0, scrollPosition);
+    })
+}
+
+function populateModal(imageId) {
+    // Get the modal:
+    const detailsModal = document.querySelector('.modal-contents');
+
+    detailsModal.innerHTML = `
+    <img src="${properties[imageId - 1].image}" alt="${properties[imageId - 1].name} image 1">
+        <h2>${properties[imageId - 1].name}</h2>
+        <p>${properties[imageId - 1].location}</p>
+        <h4>${properties[imageId - 1].price}</h4>
+        <div class="modal-ammenities">
+            <p>${properties[imageId - 1].bedrooms} <i class="fa-solid fa-bed"></i></p>
+            <p>${properties[imageId - 1].bathrooms} <i class="fa-solid fa-bath"></i></p>
+        </div>
+        <p class="property-description">${properties[imageId - 1].description}</p>
+        <button class="booking-button">Enquire Now</button>
+    `;
+}
+
+
+// --------********* SWIPER JS ********--------
 // initialise swiper js
 const swiper = new Swiper('.swiper', {
     // Optional parameters
     direction: 'vertical',
     loop: true,
-  
+
     // If we need pagination
     pagination: {
-      el: '.swiper-pagination',
-      clickable: true, // enable clickable pagination bullets
+        el: '.swiper-pagination',
+        clickable: true, // enable clickable pagination bullets
     }
-  });
+});
